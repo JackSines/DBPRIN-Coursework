@@ -1,0 +1,107 @@
+<<Demo Queries>>
+
+>Query 1:
+
+	This query selects some details for users that have unpaid bills (bills without an associated payment).
+	This is an important query for the business as it will keep them on top of what money is owed.
+
+	SELECT 
+		user_account.user_id AS "User ID",
+		user_account.user_fullName AS "Full Name", 
+		user_account.user_phoneNum AS "Phone Number",
+		bill.bill_date AS "Bill Date", 
+		bill.bill_price AS "Bill Price"
+	FROM 
+		user_account RIGHT JOIN Bill ON User_Account.user_id = Bill.user_id
+	WHERE 
+		Bill.bill_id NOT IN (SELECT Payment.bill_id FROM Payment)
+	ORDER BY
+		(SUBSTRING
+			(user_account.user_fullName,(SELECT POSITION(' ' in user_account.user_fullName)+1), 2)) DESC;
+
+>Query 2:
+
+	This query counts the number of times a bike has been used and the details of its service company.
+	It also sorts so you can see the most used bike at the top of the list.
+	This would be useful as some bikes may need a service sooner than others.
+	
+	SELECT 
+		COUNT(rental_transaction.bike_id) AS "Times Used",
+		bike.bike_id AS "Bike ID",	
+		service_company.service_companyName AS "Service Company", 
+		service_company.service_phoneNumber AS "Service Company phone"
+	FROM
+		bike JOIN contract ON bike.contract_id = contract.contract_id
+		JOIN service_company ON contract.contract_id = service_company.contract_id
+		JOIN rental_transaction ON bike.bike_id = rental_transaction.bike_id
+	GROUP BY
+		bike.bike_id,
+		service_company.service_companyName,
+		service_company.service_phoneNumber
+	ORDER BY 1 DESC;
+	
+>Query 3:
+
+	This query is a way of checking how much money is owed before the users have been billed.
+	It sums together the rental transactions for the current month to see how much should be paid at the start of the next month.
+	
+	SELECT
+		SUM(rental_transaction.transaction_price) AS "Total amount owed",
+		COUNT(rental_transaction.transaction_id) AS "Number of transactions",
+		COUNT(DISTINCT(rental_transaction.user_id)) AS "Number of users"
+	FROM 
+		rental_transaction
+	WHERE 
+		rental_transaction.transaction_returnTime IS NOT NULL AND
+		EXTRACT(month FROM NOW()) = EXTRACT(month FROM rental_transaction.transaction_returnTime);
+	
+	
+>Query 4
+
+	This query selects user details including either member type or the date they bought their visitor pass.
+	It also selects the last 4 digits of their card number and if it's expired or not.
+	This card info allows for any problems with payment to be easily identified when talking to the customer.
+	
+	
+	SELECT 
+		user_account.user_fullName AS "Full name", 
+		user_account.user_phoneNum AS "Phone number", 
+		user_account.user_email AS "Email",
+		member.member_type AS "Member type (if member)",
+		visitor.visitor_timeOfPurchase AS "Time of pass purchase (if visitor)",
+		REGEXP_REPLACE(card_info.card_number, '.{12}', 'ends in...') AS "Registered card",
+		CASE	
+			WHEN card_info.card_expiryDate < NOW()
+			THEN 'Yes'
+			
+			ELSE 'No'
+		END AS "Card expired?"
+	FROM 
+		user_account 
+			LEFT JOIN member ON user_account.user_id = member.user_id
+			LEFT JOIN visitor ON user_account.user_id = visitor.user_id
+			LEFT JOIN card_info on user_account.user_id = card_info.user_id
+
+	WHERE
+		user_account.user_id = '10';
+	
+>Query 5
+	
+	This query selects the number of bike transactions per hour for the last week.
+	This highlights the busiest hours for the last 7 days, giving an up to date look at the peak times.
+	This can be easily modified to see the number of transactions per hour since the start of the database.
+	
+	SELECT 	
+		date_trunc('hour', transaction_pickupTime::time) AS "Time",
+		COUNT(rental_transaction.transaction_pickupTime::time) AS "Total bike pick ups"
+	FROM 
+		rental_transaction
+	WHERE 
+		transaction_pickUpTime > NOW() - interval '7 days'
+	GROUP BY 
+		date_trunc('hour', transaction_pickupTime::time)
+	ORDER BY 1 ASC;
+
+
+
+	
